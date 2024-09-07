@@ -133,6 +133,7 @@ public class MybatisAutoConfiguration implements InitializingBean {
     }
   }
 
+  // 1. 先创建必须的SqlSessionFactory，接管不用SqlSessionFactoryBean来创建SqlSessionFactory
   @Bean
   @ConditionalOnMissingBean
   public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
@@ -142,6 +143,8 @@ public class MybatisAutoConfiguration implements InitializingBean {
     if (StringUtils.hasText(this.properties.getConfigLocation())) {
       factory.setConfigLocation(this.resourceLoader.getResource(this.properties.getConfigLocation()));
     }
+
+    // 生成Configuration对象
     applyConfiguration(factory);
     if (this.properties.getConfigurationProperties() != null) {
       factory.setConfigurationProperties(this.properties.getConfigurationProperties());
@@ -184,6 +187,8 @@ public class MybatisAutoConfiguration implements InitializingBean {
       factory.setDefaultScriptingLanguageDriver(defaultLanguageDriver);
     }
     applySqlSessionFactoryBeanCustomizers(factory);
+    // 触发创建对象SqlSessionFactory
+    // DefaultSqlSessionFactory
     return factory.getObject();
   }
 
@@ -208,10 +213,12 @@ public class MybatisAutoConfiguration implements InitializingBean {
     }
   }
 
+  // 依赖SqlSessionFactory来创建SqlSessionTemplate
   @Bean
   @ConditionalOnMissingBean
   public SqlSessionTemplate sqlSessionTemplate(SqlSessionFactory sqlSessionFactory) {
     ExecutorType executorType = this.properties.getExecutorType();
+    // 指定了ExecutorType（线程池类型？）
     if (executorType != null) {
       return new SqlSessionTemplate(sqlSessionFactory, executorType);
     } else {
@@ -230,6 +237,8 @@ public class MybatisAutoConfiguration implements InitializingBean {
     private BeanFactory beanFactory;
     private Environment environment;
 
+    // 就是注册MapperScannerConfigurer到spring上下文里，在beanfactory初始化后扫描@Mapper类
+    // MapperScannerConfigurer作用就是扫描mapper bean，并定义使用MapperFactoryBean 来创建bean
     @Override
     public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
 
@@ -247,8 +256,9 @@ public class MybatisAutoConfiguration implements InitializingBean {
 
       BeanDefinitionBuilder builder = BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class);
       builder.addPropertyValue("processPropertyPlaceHolders", true);
-      builder.addPropertyValue("annotationClass", Mapper.class);
-      builder.addPropertyValue("basePackage", StringUtils.collectionToCommaDelimitedString(packages));
+      builder.addPropertyValue("annotationClass", Mapper.class); // 要求扫描Mapper注解
+      builder.addPropertyValue("basePackage", StringUtils.collectionToCommaDelimitedString(packages));// basePackage路径
+      // 封装下
       BeanWrapper beanWrapper = new BeanWrapperImpl(MapperScannerConfigurer.class);
       Set<String> propertyNames = Stream.of(beanWrapper.getPropertyDescriptors()).map(PropertyDescriptor::getName)
           .collect(Collectors.toSet());
@@ -279,6 +289,8 @@ public class MybatisAutoConfiguration implements InitializingBean {
       }
       builder.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
 
+      // 注册MapperScannerConfigurer到spring上下文
+      // 让postProcessBeanDefinitionRegistry(BeanFactoryPostProcessor的扩展点)，在beanFactory初始化后扫描mapper bean的类
       registry.registerBeanDefinition(MapperScannerConfigurer.class.getName(), builder.getBeanDefinition());
     }
 
